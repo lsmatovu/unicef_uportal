@@ -5,8 +5,8 @@ $databases = array (
     'default' => 
     array (
       'database' => 'uportaldb',
-      'username' => 'drupal',
-      'password' => 'WrX6QzyqFWB2v9d2',
+      'username' => 'put_username_here',
+      'password' => 'put_password_here',
       'host' => 'localhost',
       'port' => '',
       'driver' => 'mysql',
