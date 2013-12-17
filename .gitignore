@@ -7,6 +7,7 @@
 .metadata
 bin/
 tmp/
+sites/all/modules/clientside_validation/clientside_validation_testswarm/
 *.tmp
 *.bak
 *.swp
