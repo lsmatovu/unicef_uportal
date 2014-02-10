@@ -39,7 +39,7 @@ function ugyouthportal_theme_preprocess_html(&$vars) {
 		$vars['classes_array'][] = drupal_html_class('section-'.$path_parts[0]);
 		if (isset($path_parts[1])) $vars['classes_array'][] = drupal_html_class('section-2-'.$path_parts[1]);
 		if (arg(0)=='node' && is_numeric($nid=arg(1))) {
-			$no_h1_nids = array('1078'=>1);
+			$no_h1_nids = array('1078'=>1, '234'=>1, );
 			//$no_breadcrumb_nids = array('10'=>1);
 			if (isset($no_h1_nids[$nid]))
 				$vars['classes_array'][] = 'no-h1';
@@ -129,7 +129,6 @@ function ugyouthportal_theme_preprocess_page(&$vars) {
  */
 function ugyouthportal_theme_form_alter(&$form, &$form_state, $form_id) {
 	if ($form['#id'] == 'comment-form') {
-		//dsm($form);
 		$body_label = 'What do you think about this ';
 		switch ($form['#node']->type) {
 			case 'video': $body_label .= 'video?'; break;

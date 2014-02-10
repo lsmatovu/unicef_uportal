@@ -38,6 +38,14 @@ function ugyouthportal_block_info() {
 			'info' => t('Index Filters - Showing Active Filters'),
 			'cache' => DRUPAL_NO_CACHE,
 		),
+		'index_page_header' => array(
+			'info' => t('Index Page Header title'),
+			'cache' => DRUPAL_NO_CACHE,
+		),
+		'index_clear_search' => array(
+			'info' => t('Clear Search button'),
+			'cache' => DRUPAL_NO_CACHE,
+		),
 	);
 }
 /** ENDS **************************************************/
@@ -83,6 +91,13 @@ function ugyouthportal_block_view($delta='') {
 			$block['subject'] = t('');
 			$block['content'] = _ugyouthportal_get_index_filters_active();
 			break;
+		case 'index_page_header':
+			$block['subject'] = t('');
+			$block['content'] = _ugyouthportal_index_page_header();
+			break;
+		case 'index_clear_search':
+			$block['subject'] = '';
+			$block['content'] = _ugyouthportal_index_clear_search();
 	}
 	
 	return $block;
@@ -101,6 +116,77 @@ function ugyouthportal_get_listing_page_content() {
 	return $html_str;
 }
 /** ENDS **************************************************/
+
+
+/**
+ * block content for index page header
+ */
+function _ugyouthportal_index_page_header() {
+
+	global $ugyouthportal_data;
+	
+	if (!isset($ugyouthportal_data['current-index-filter-values']) || count($_SESSION['uportal_index_page_results'])<=0) {
+		return FALSE;
+	}
+	
+	$current_index_filter_values = $ugyouthportal_data['current-index-filter-values'];
+	$full_filters = $_SESSION['uportal_index_full_filters'];
+	
+	$header_str = '<div class="index-page-header topic-header clearfix">';
+	
+	//if all page
+	if ($current_index_filter_values['category-nid']=='all' && $current_index_filter_values['page-type']!='all-lesson-plans') {
+		return FALSE;
+	}
+	
+	//category filter
+	elseif ($current_index_filter_values['page-type']!='all-lesson-plans') {
+		$topic_nid = $current_index_filter_values['category-nid'];
+		$topic_title = $full_filters['topics']['nid-'.$topic_nid]['title'];
+		$topic_node = node_load($topic_nid);
+		$img = theme_image(array(
+			'path' => $topic_node->field_icon_2['und'][0]['uri'],
+			'width' => $topic_node->field_icon_2['und'][0]['width'],
+			'height' => $topic_node->field_icon_2['und'][0]['height'],
+			'attributes' => array(),
+		));
+		$header_str .= '<div class="img">'.$img.'</div><div class="txt">'.$topic_title.'</div>';
+	}
+	
+	//lesson plans page
+	elseif ($current_index_filter_values['page-type']=='all-lesson-plans') {
+		$index_lesson_plan_icon = theme_image(array(
+			'path' => path_to_theme().'/images/icon-lesson-plan-blue.png',
+			'attributes' => array(),
+		));
+		$header_str .= '<div class="img">'.$index_lesson_plan_icon.'</div><div class="txt">Lesson Plans</div>';
+	}
+	
+	$header_str .= '</div>';
+	
+	return $header_str;
+	
+}
+/** ENDS **************************************************/
+
+
+/**
+ * block content for clear search on index page
+ */
+function _ugyouthportal_index_clear_search() {
+	global $ugyouthportal_data;
+	$current_index_filter_values = $ugyouthportal_data['current-index-filter-values'];
+	$link = '';
+	if (isset($current_index_filter_values['search-term']) && $current_index_filter_values['search-term']) {
+		$link_options = array(
+			'title' => 'Reset Search',
+			'html-link' => false,
+			'killsearch' => TRUE,
+		);
+		$link = _ugyouthportal_get_index_link($current_index_filter_values, $link_options, 'all');
+	}
+	return '<div class="kill-search-btn">'.$link.'</div>';
+}
 
 
 /**
@@ -217,7 +303,7 @@ function _ugyouthportal_get_index_navigation_main() {
 	
 	//all content link
 	$link_options = array(
-		'title' => 'All Content',
+		'title' => 'Individual Items',
 		'html-link' => true,
 	);
 	$link = _ugyouthportal_get_index_link($current_index_filter_values, $link_options, 'all-content-main-nav');
@@ -263,11 +349,13 @@ function _ugyouthportal_create_index_filter_navigation($type) {
 	$nav_str = ($type=='skill-levels') ? '<ul class="clearfix index-nav-skill-levels">' : '<ul class="index-nav listing-filter-nav index-nav-'.$type.'">';
 	
 	foreach ($filters as $filter) {
+		/*
 		if ($type=='skill-levels' && $filter['arg']=='all') {
 			continue;
 		}
+		*/
 		$count = $filter['current-counts'][$current_index_filter_values['page-type']];
-		if ($current_index_filter_values['all_page'] || ($type=='topics' || $type=='skill-levels')) {
+		if ($current_index_filter_values['all_page'] || ($type=='topics')) {
 			$count = $filter['total-counts'][$current_index_filter_values['page-type']];
 		}
 		$link_options = array(

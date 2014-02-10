@@ -17,6 +17,7 @@ if (count($field_video)) {
 	$video_path = file_create_url($field_video[0]['uri']);
 	$video_mime = $field_video[0]['filemime'];
 }
+
 $body_content = isset($body[0]['safe_value']) ? $body[0]['safe_value'] : '';
 $provider_block = isset($field_content_provider_reference[0]['target_id']) ? views_embed_view('providers', 'block_0', $field_content_provider_reference[0]['target_id']) : '';
 $topic_title_block = isset($field_topic_reference[0]['target_id']) ? views_embed_view('navigation', 'block_2', $field_topic_reference[0]['target_id']) : '';
@@ -42,6 +43,7 @@ $file_name = drupal_html_class($title);
 $download_filename = $file_name.'.'.$file_extension;
 
 $link_download = '<a class="download btn btn-icon" download="'.$download_filename.'" href="'.$video_path.'" title="Download this video" id="download-video">Download</a>';
+
 
 $meta_info = _ugyouthportal_get_content_meta_info($content, $node);
 

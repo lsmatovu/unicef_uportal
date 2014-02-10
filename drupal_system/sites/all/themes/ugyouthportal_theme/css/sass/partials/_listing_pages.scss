@@ -201,6 +201,7 @@ ul.listing-filter-nav {
 		.count {
 			color: #999;
 			@include ems_font_size(12px, 15px);
+			display: none;
 		}
 	}
 	.no-link {
@@ -250,7 +251,7 @@ ul.index-nav-skill-levels {
 		color: $link-dark-blue;
 		line-height: 25px;
 		padding: 0 12px;
-		@include ems_font_size(10px, 16px);
+		@include ems_font_size(13px, 16px);
 		&:hover {
 			text-decoration: none;
 			color: #fff;

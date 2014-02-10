@@ -52,7 +52,7 @@ foreach ($results_by_topic as $topic) {
 	
 	//topic link
 	$link_options = array(
-		'title' => t('More '),
+		'title' => t('More in ').$topic['topic-title'],
 		'arg' => $topic['topic-nid'],
 		'alias' => $topic['topic-title-aliased'],
 		'count' => $topic['no-of-content'],
@@ -60,15 +60,20 @@ foreach ($results_by_topic as $topic) {
 	);
 	$topic_link = _ugyouthportal_get_index_link($current_index_filter_values, $link_options, 'landing-page-topic-in-content');
 	
+	//topic header link
+	$link_options = array(
+		'title' => '<span class="img">'.$topic['topic-icon'].'</span><span class="txt">'.$topic['topic-title'].'</span>',
+		'arg' => $topic['topic-nid'],
+		'alias' => $topic['topic-title-aliased'],
+		'html-link' => TRUE,
+	);
+	$topic_header_link = _ugyouthportal_get_index_link($current_index_filter_values, $link_options, 'landing-page-topic-in-content-header');
+	
 	//build string
 	$str .= '<div class="topic-results">';
 	
 	//topic header
-	$str .= '<div class="topic-header clearfix">';
-	$str .= '<div class="img">'.$topic['topic-icon'].'</div>';
-	$str .= '<div class="txt">'.$topic['topic-title'].'</div>';
-	$str .= ($show_no_per_topic<$topic['no-of-content']) ? '<div class="topic-link">'.$topic_link.'</div>' : '';
-	$str .= '</div>';
+	$str .= '<div class="topic-header clearfix">'.$topic_header_link.'</div>';
 	
 	//topic content
 	$content_cnter = 1;
@@ -82,6 +87,9 @@ foreach ($results_by_topic as $topic) {
 		$str .= '</div>';
 	}
 	$str .= '</div>';
+	
+	//topic footer
+	$str .= ($show_no_per_topic<$topic['no-of-content']) ? '<div class="topic-footer"><div class="topic-link">'.$topic_link.'</div></div>' : '';
 	
 	$str .= '</div>';
 }

@@ -30,7 +30,9 @@
  *     changes of implementing modules and to support different versions of a
  *     library simultaneously (though only one version can be installed per
  *     site). A valid use-case is an external library whose version cannot be
- *     determined programmatically.
+ *     determined programmatically. Either 'version' or 'version callback' (or
+ *     'version arguments' in case libraries_get_version() is being used as a
+ *     version callback) must be declared.
  *   - version callback: (optional) The name of a function that detects and
  *     returns the full version string of the library. The first argument is
  *     always $library, an array containing all library information as described
@@ -51,8 +53,9 @@
  *     the version callback as separate arguments in the order they were
  *     declared. The default version callback libraries_get_version() expects a
  *     single, associative array with named keys:
- *     - file: The filename to parse for the version, relative to the library
- *       path. For example: 'docs/changelog.txt'.
+ *     - file: The filename to parse for the version, relative to the path
+ *       speficied as the 'library path' property (see above). For example:
+ *       'docs/changelog.txt'.
  *     - pattern: A string containing a regular expression (PCRE) to match the
  *       library version. For example: '@version\s+([0-9a-zA-Z\.-]+)@'. Note
  *       that the returned version is not the match of the entire pattern (i.e.

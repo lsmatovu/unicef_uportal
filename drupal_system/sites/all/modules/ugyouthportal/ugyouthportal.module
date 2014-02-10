@@ -1,5 +1,10 @@
 <?php
 
+/**
+ * Ensure that this module's weight is greater than pubdlcnt
+ * for proper download stats
+ */
+
 
 global $ugyouthportal_data;
 $ugyouthportal_data['no_per_listing_page'] = 20;
@@ -108,7 +113,7 @@ function ugyouthportal_menu() {
 		'type'							=>	MENU_CALLBACK,
 		'file'							=>	'ugyouthportal.admin.inc',
 	);
-	$items['index/%/%/%/%/%'] = array (
+	$items['content-index/%/%/%/%/%'] = array (
 		'title'							=>	'Content Index',
 		'page callback'			=>	'ugyouthportal_get_index_page',
 		'page arguments'		=>	array(1),
@@ -345,6 +350,49 @@ function ugyouthportal_node_view($node, $view_mode, $langcode) {
 }
 /** END ************************/
 
+
+/**
+ * implement hook_node_view_alter
+ *
+ */
+function ugyouthportal_node_view_alter(&$build) {
+
+  $nodetype = $build['#node']->type;
+  $supported_nodetypes = variable_get('pubdlcnt_supported_nodetypes', array());
+
+  $num_supported_nodetypes = 0;
+  foreach ($supported_nodetypes as $type => $value) {
+    if ($value != 0) {
+      $num_supported_nodetypes++;
+    }
+  }
+
+  if (!$num_supported_nodetypes || !empty($supported_nodetypes[$nodetype])) {
+    if($build['#view_mode'] == 'full' || $build['#view_mode'] == 'teaser') {
+      // we count only the download for the full/teaser mode of the supported node types.
+      $build['#post_render'][] = 'ugyouthportal_pubdlcnt_post_render';
+    }
+  }
+}
+/** ENDS *****************************************/
+
+
+/**
+ * render node content to insert download count links
+ */
+function ugyouthportal_pubdlcnt_post_render($html, $build) {
+	
+	$html = str_replace(
+		'modules/pubdlcnt/pubdlcnt.php',
+		'modules/ugyouthportal/ugyouthportal.pubdlcnt.php',
+		$html
+	);
+  return $html;
+
+}
+/** ENDS *****************************************/
+
+
 /**
  * implement node_delete
  *
@@ -396,16 +444,16 @@ function _ugyouthportal_create_file_size_data($node) {
 }
 /** END ************************/
 
-
 /**
  * make search form for index page
  */
 function ugyouthportal_index_search_form($form, &$form_state) {
 	$form['search_field'] = array (
 		'#type' => 'textfield',
-		'#required' => TRUE,
+		//'#required' => TRUE,
 		'#attributes' =>array(
-			'placeholder' => (isset($_SESSION['uportal_index_search_term']) && $_SESSION['uportal_index_search_term']) ? $_SESSION['uportal_index_search_term'] : t('Type keywords here'),
+			'placeholder' => t('Type keywords here'),
+			'value' => (isset($_SESSION['uportal_index_search_term']) && $_SESSION['uportal_index_search_term']) ? $_SESSION['uportal_index_search_term'] : '',
 		),
 		//'#title' => "", //no label
 		//'#description' => '', //no description
@@ -423,10 +471,19 @@ function ugyouthportal_index_search_form($form, &$form_state) {
  * submit function for search form
  */
 function ugyouthportal_index_search_form_submit($form, &$form_state) {
-	dsm($form_state);
 	module_load_include('index_page.inc', 'ugyouthportal');
-	$_SESSION['uportal_index_search_term'] = $form_state['values']['search_field'];
-	$all_url = _ugyouthportal_get_url(array(), array(), 'all');
+	$search_term = $form_state['values']['search_field'];
+	
+	//check for existence of words
+	if ($search_term=='' || ctype_space($search_term)) { //either empty or full of whitespace
+		//kill search
+		$all_url = _ugyouthportal_get_url(array(), array('killsearch'=>1), 'all');
+	} else {
+		$_SESSION['uportal_index_search_term'] = $search_term;
+		$all_url = _ugyouthportal_get_url(array(), array(), 'all');
+	}
+	
+	//$form_state['redirect'] = array($all_url['url'], $all_url['options']);
 	drupal_goto($all_url['url'], $all_url['options']);
 }
 /** END ************************/
@@ -439,9 +496,16 @@ function ugyouthportal_form_alter(&$form, &$form_state, $form_id) {
 	
 	//dsm($form);
 	if ($form['#id']=='comment-form') {
+		$form['actions']['submit']['#value'] = t('Post Comment');
 		$form['#validate'][] = 'ugyouthportal_validate_comments';
 		//dsm($form);
 	}
+	
+	/*
+	if ($form['#id']=='ugyouthportal-index-search-form') {
+		$form['#submit'][] = 'ugyouthportal_index_search_form_submit_no2';
+	}
+	*/
 	
 	/****
 	 * TODO
@@ -535,7 +599,7 @@ function _ugyouthportal_get_content_meta_info($node_content, $node) {
 		$no_items = $series_info['playlist-no'] . (($series_info['playlist-no']>1) ? ' items' : ' item');
 		$series_nav_classes = 'nav-btn nav-btn-playlist';
 		if(!$related_info) $series_nav_classes .= ' nav-btn-last';
-		$meta_info_nav .= '<li class="'.$series_nav_classes.'"><a class="btn" href="#playlist" title="View the playlist for this series">Playlist <span>('.$no_items.')</span></a></li>';
+		$meta_info_nav .= '<li class="'.$series_nav_classes.'"><a class="btn" href="#playlist" title="View the playlist for this series">Series <span>('.$no_items.')</span></a></li>';
 	}
 	
 	//related content
@@ -601,6 +665,7 @@ function _ugyouthportal_get_node_series_content($node) {
 	if (isset($_GET['from']) && $_GET['from']=='lesson-plan' && isset($_GET['from-nid']) && is_numeric($_GET['from-nid'])) {
 		$lesson_plan_nid = $_GET['from-nid'];
 		$series_content = views_get_view_result('series', 'block_2', $lesson_plan_nid);
+		$series_content = _ugyouthportal_clean_up_repeated_results_from_series($series_content);
 		$playlist_no = count($series_content);
 		
 		//get lesson plan title
@@ -618,11 +683,13 @@ function _ugyouthportal_get_node_series_content($node) {
 	} elseif ($in_series) { //has a playlist
 		$series_nid = $node->field_series_reference[$series_language_index][0]['target_id'];
 		$series_content = views_get_view_result('series', 'block_0', $series_nid);
+		$series_content = _ugyouthportal_clean_up_repeated_results_from_series($series_content);
 		$playlist_no = count($series_content);
-		$series_title = 'Playlist: '.$node->field_series_reference[$series_language_index][0]['entity']->title.' ('.$playlist_no.' items)';
+		$series_title = 'Series: '.$node->field_series_reference[$series_language_index][0]['entity']->title.' ('.$playlist_no.' items)';
 		$series_content_str = '<ul class="series-content-wrapper series-playlist">';
 	} else {
 		$series_content = views_get_view_result('series', 'block_1', $topic_nid);
+		$series_content = _ugyouthportal_clean_up_repeated_results_from_series($series_content);
 		$playlist_no = count($series_content);
 		$series_title = t('Related content in ').$topic_link;
 		$series_content_str = '<ul class="series-content-wrapper related-content">';
@@ -684,7 +751,7 @@ function _ugyouthportal_get_node_series_content($node) {
 		//$size = _ugyouthportal_get_node_media_size($series_item->_field_data['nid']['entity']);
 		
 		$languages = locale_language_list('name');
-		$language_code = $series_item->node_language;
+		$language_code = $series_item->node_language=='und' ? 'en' : $series_item->node_language;
 		$language = $languages[$language_code];
 		
 		//build series content item
@@ -719,6 +786,30 @@ function _ugyouthportal_get_node_series_content($node) {
 }
 /** END ************************/
 
+	
+/**
+ *
+ * TODO
+ * 
+ * this is a dirty hack for repeated results from the Views SQL query which needs to be properly modified to avoid repeated results
+ *
+ * I suspect the NODEQUEUE join to be the culprit - no investigation carried out
+ *
+ */
+function _ugyouthportal_clean_up_repeated_results_from_series($series_content) {
+	$unique_nids = array();
+	$unique_results = array();
+	foreach ($series_content as $series_item) {
+		$item_nid = $series_item->nid;
+		if (!isset($unique_nids['nid-'.$item_nid])) {
+			$unique_nids['nid-'.$item_nid] = 1;
+			$unique_results[] = $series_item;
+		}
+	}
+	return $unique_results;
+}
+/** ENDS *****************************************/
+
 
 /**
  * return node's media size
@@ -750,6 +841,7 @@ function ugyouthportal_views_pre_render(&$view) {
 		$ugyouthportal_data['body_classes'][] = 'views-'.$view->name.'-'.$view->current_display;
 		if ($view->name=='listing_pages' && $view->current_display=='page_4') {
 			$ugyouthportal_data['body_classes'][] = 'listing-page';
+			$ugyouthportal_data['body_classes'][] = 'isotope-page';
 		}
 	}
 	
@@ -806,41 +898,7 @@ function ugyouthportal_views_query_alter(&$view, &$query) {
 			$_SESSION['current_listing_page_no'] = $current_page;
 		}
 	}
-	
-	//index page
-	if ($view->name == 'content_index' && $view->current_display=='block_1' &&  $query->where) {
-		if (isset($_SESSION['uportal_index_search_term']) && $_SESSION['uportal_index_search_term']) {
-			
-			//add body field table
-			$join = new views_join;
-			$join->construct(
-				'field_data_body',
-        'node',  // left table
-        'nid',   // left field
-        'entity_id'   // field
-			);
-			$query->add_relationship('field_data_body', $join, 'node');
-			
-			//modify query
-			$query->where[] = array (
-				'conditions' => array(
-					array (
-						'field' => 'node.title',
-						'value' => '%'.$_SESSION['uportal_index_search_term'].'%',
-						'operator' => 'LIKE',
-					),
-					array (
-						'field' => 'field_data_body.body_value',
-						'value' => '%'.$_SESSION['uportal_index_search_term'].'%',
-						'operator' => 'LIKE',
-					),
-				),
-				'args' => array(),
-				'type' => 'OR',
-			);
-			
-		}
-	}
+
 }
 /** END ************************/
 
@@ -1036,7 +1094,7 @@ FROM {node} node LEFT JOIN {nodequeue_nodes} nodequeue_nodes_node ON node.nid = 
 /**
  */
 
- 
+
 /**
  * customise comment messages
  */
@@ -1072,6 +1130,42 @@ function ugyouthportal_validate_comments($form, &$form_state) {
 }
 /** END ************************/
 
+
+/**
+ * helper function for mime types
+ *
+ * assuming correct extensions
+ */
+function _ugyouthportal_mime_content_type($filename) {
+	
+	$mime_types = array(
+		'ogg' => 'audio/ogg',
+		'oga' => 'audio/ogg',
+		'mp4' => 'video/mp4',
+		'ogv' => 'video/ogg',
+		'm4v' => 'video/x-m4v',
+		'swf' => 'application/x-shockwave-flash',
+		'flv' => 'video/x-flv',
+		'mp3' => 'audio/mpeg3',
+		'qt' => 'video/quicktime',
+		'mov' => 'video/quicktime',
+		'pdf' => 'application/pdf',
+	);
+	
+	$ext = strtolower(array_pop(explode('.',$filename)));
+	if (array_key_exists($ext, $mime_types)) {
+			return $mime_types[$ext];
+	}
+	elseif (function_exists('finfo_open')) {
+			$finfo = finfo_open(FILEINFO_MIME);
+			$mimetype = finfo_file($finfo, $filename);
+			finfo_close($finfo);
+			return $mimetype;
+	}
+	else {
+			return 'application/octet-stream';
+	}
+}
 
 
 

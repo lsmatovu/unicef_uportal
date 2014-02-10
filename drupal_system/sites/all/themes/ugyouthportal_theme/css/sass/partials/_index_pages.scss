@@ -21,11 +21,40 @@ body.index-page {
 	padding: 24px;
 	font-style: italic;
 }
+.no-index-results-page {
+	font-style: normal;
+	padding: 16px 7px 0;
+	color: #000;
+	height: 323px;
+	p {
+		line-height: 1em;
+		font-weight: bold;
+		margin-bottom: 20px;
+	}
+	a.btn {
+		background-color: #2c3e50;
+		width: 170px;
+		text-transform: none;
+		font-weight: normal;
+		&:hover {
+			background-color: #3498db;
+		}
+	}
+	li {
+		padding: 0 0 6px 22px;
+		background: url("../../images/no-index-results-bullet.gif") no-repeat 4px 9px;
+		a, a.active {
+			color: #333366;
+			text-decoration: underline;
+			font-weight: bold;
+		}
+	}
+}
 /*** ENDS ***********************/
 
 /*** index search form *****************************************/
 #block-ugyouthportal-index-search-form {
-	padding: 18px 17px 27px 15px;
+	padding: 18px 17px 0 15px;
 	height: 44px;
 	form {
 		overflow: hidden;
@@ -43,7 +72,6 @@ body.index-page {
 		margin: 0;
 		border: none;
 		padding-left: 10px;
-		font-style: italic;
 		font-size: 23px;
 		width: 601px;
 		@include box-sizing('border-box');
@@ -88,7 +116,7 @@ body.index-page {
 		line-height: 45px;
 		padding: 0 21px;
 		color: #2c3e50;
-		font-weight: 600;
+		font-weight: bold;
 		position: relative;
 		@include single-transition(color);
 		@include single-transition(background-color);
@@ -107,36 +135,70 @@ body.index-page {
 }
 /*** ENDS ***********************/
 
+
+/*** index page - clear search link ***********/
+#block-ugyouthportal-index-clear-search {
+	height: 27px;
+	text-align: right;
+	line-height: 27px;
+	padding-right: 17px;
+	a {
+		text-decoration: underline;
+		color: #2c3e50;
+	}
+}
+/*** ENDS ***********************/
+
+
+
 /*** landing index page ***************************************/
+#block-ugyouthportal-index-page-header {
+	padding-top: 10px;
+}
+.topic-header {
+	border-bottom: 1px solid #d9d9d9;
+	padding-bottom: 7px;
+	position: relative;
+	margin-left: 25px;
+	a, img {
+		display: block;
+		&:hover {
+			text-decoration: none;
+		}
+	}
+	.img {
+		width: 19px;
+		padding: 3px 6px 0 0;
+		position: absolute;
+		left: -24px; top: 0;
+	}
+	.txt {
+		font-weight: bold;
+		color: #2c3e50;
+		height: 24px;
+		line-height: 24px;
+		text-decoration: none;
+	}
+	.topic-link {
+		float: right;
+		text-align: right;
+		a {
+			font-weight: bold;
+			color: #2c3e50;
+		}
+	}
+}
 .index-all-content {
 	.topic-results {
 		padding: 10px 0 5px 0;
 	}
-	.topic-header {
-		border-bottom: 1px solid #d9d9d9;
-		padding-bottom: 7px;
-		a, img {
-			display: block;
-		}
-		.img {
-			width: 19px;
-			float: left;
-			padding: 3px 6px 0 0;
-		}
-		.txt {
-			float: left;
-			font-weight: bold;
+	.topic-footer {
+		text-align: right;
+		line-height: 1em;
+		padding-bottom: 15px;
+		a {
+			text-decoration: underline;
 			color: #2c3e50;
-			height: 24px;
-			line-height: 24px;
-		}
-		.topic-link {
-			float: right;
-			text-align: right;
-			a {
-				font-weight: bold;
-				color: #2c3e50;
-			}
 		}
 	}
 }
@@ -144,10 +206,15 @@ body.index-page {
 
 /** content *****************************************************************/
 .index-topic-content {
-	padding: 10px 0;
+	padding: 10px 0 0;
 	position: relative;
+	margin-left: 25px;
 	a, img, span {
 		display: block;
+	}
+	img {
+		max-width: 100%;
+		height: auto;
 	}
 	.icon {
 		position: absolute;
@@ -175,7 +242,7 @@ body.index-page {
 	.img {
 		float: left;
 		width: 130px; height: 80px;
-		padding-right: 18px;
+		padding-right: 20px;
 		position: relative;
 	}
 	.small-img {
@@ -185,7 +252,7 @@ body.index-page {
 	}
 	.txt {
 		float: left;
-		width: 466px;
+		width: 450px;
 	}
 	.title {
 		color: #2c3e50;
@@ -200,14 +267,14 @@ body.index-page {
 	}
 	.bottom-border {
 		height: 10px;
-		margin-left: 148px;
 		border-bottom: solid 1px #d9d9d9;
 		clear: both;
 	}
 	&.last-row {
 		padding-bottom: 0;
 		.bottom-border {
-			margin-left: 0;
+			border-bottom: none;
+			height: 15px;
 		}
 	}
 }
@@ -270,6 +337,10 @@ body.index-page {
 			padding-right: 33px;
 		}
 	}
+	
+	/***
+	 * removing this functionality
+	 * 
 	&:hover {
 		.content {
 			background-color: #d9d9d9;
@@ -278,6 +349,7 @@ body.index-page {
 			display: block;
 		}
 	}
+	*************************/
 }
 /*** ENDS ***********************/
 

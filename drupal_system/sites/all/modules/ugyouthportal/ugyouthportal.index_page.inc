@@ -18,6 +18,7 @@
  */
 
 
+
 /**
  * get content index page
  */
@@ -26,40 +27,32 @@ function ugyouthportal_get_index_page($page_type) {
 	//to fix ajax 404 error because it didn't work on the unicef server
 	//header('HTTP/1.1 200 OK', true, 200);
 	
-	dsm($_POST);
-	dsm($_GET);
-	dsm($GLOBALS);
+	//dsm($_GET);
 	
 	global $ugyouthportal_data;
 	$content = '';
 	$page_args = arg();
-	
-	//check for empty $_GET
-	//to fix empty $_GET which seems not to work on unicef server
-	if (!isset($_GET['cid'])) {
-		$server_uri = $_SERVER['REQUEST_URI'];
-		$server_uri_parts = explode('?', $server_uri);
-		if (count($server_uri_parts)>1) {
-			$querystring = $server_uri_parts[1];
-			$querystring_parts = explode('&', $querystring);
-			foreach ($querystring_parts as $query_value) {
-				$query_value_parts = explode('=', $query_value);
-				if (!isset($query_value_parts[1])) $query_value_parts[1] = TRUE;
-				$_GET[$query_value_parts[0]] = rawurldecode($query_value_parts[1]);
-			}
-		}
-	}
 	
 	//add class
 	$ugyouthportal_data['body_classes'][] = 'listing-page';
 	$ugyouthportal_data['body_classes'][] = 'index-page';
 	$ugyouthportal_data['body_classes'][] = $page_type;
 	
+	//empty string
+	$link_options = array(
+		'title' => 'Reset Search',
+		'html-link' => false,
+		'killsearch' => TRUE,
+		'class' => array('btn'),
+	);
+	$all_link = _ugyouthportal_get_index_link(array(), $link_options, 'all');
+	$empty_string = '<div class="no-index-results no-index-results-page"><p>Sorry, no content matches your search terms.</p><p class="link-btn">'.$all_link.'</p>';
+	
 	//set current filters
 	$current_index_filter_values = _ugyouthportal_get_current_index_filter_values();
 	if (!($current_index_filter_values && count($current_index_filter_values))) {
 		drupal_set_title('No Results | Content Index');
-		return '<div class="no-index-results">No results for this filter set. Please try again.</div>';
+		return $empty_string;
 	}
 	$ugyouthportal_data['current-index-filter-values'] = $current_index_filter_values;
 	
@@ -97,18 +90,25 @@ function ugyouthportal_get_index_page($page_type) {
 	$page_no = isset($_GET['page']) ? $_GET['page'] : 0;
 	$ugyouthportal_data['index_current_page'] = $page_no; //for use in views template
 	$ugyouthportal_data['index_page_no'] = count($results_by_page); //for use in views template
-	if (!isset($results_by_page[$page_no])) {
-		return '';
+	
+	//check for empty page
+	if (!isset($results_by_page[$page_no]) || count($page_result_nids)<=0) {
+		drupal_set_title('No Results | Content Index');
+		return $empty_string;
 	}
 	
 	//get content from views
 	$views_args = implode('+', $results_by_page[$page_no]);
 	$views_display = 'block_2';
 	if ($current_index_filter_values['page-type']=='all-content' && ($current_index_filter_values['all_page'] || $current_index_filter_values['category-nid']=='all')) {
+		//dsm($page_result_nids);
+		//dsm(implode('+', $page_result_nids));
 		$views_args = implode('+', $page_result_nids);
 		$views_display = 'block_1';
-	}
-	if ($current_index_filter_values['page-type']=='all-lesson-plans' || $current_index_filter_values['page-type']=='all-series') {
+	} elseif ($current_index_filter_values['page-type']=='all-series' && ($current_index_filter_values['all_page'] || $current_index_filter_values['category-nid']=='all')) {
+		$views_args = implode('+', $page_result_nids);
+		$views_display = 'block_6';
+	} elseif ($current_index_filter_values['page-type']=='all-lesson-plans' || $current_index_filter_values['page-type']=='all-series') {
 		$views_display = 'block_3';
 	}
 	$content = views_embed_view('content_index', $views_display, $views_args);
@@ -156,6 +156,15 @@ function _ugyouthportal_set_index_page_results($current_index_filters) {
 			$satisfies_filters = isset($result['topic-nids']['nid-'.$current_index_filters['category-nid']]);
 			if (!$satisfies_filters) continue;
 			
+			//activate these skill level filters for this result
+			//always show the all result
+			$full_index_filters['skill-levels']['nid-all']['current-counts'][$page_type] = 1;
+			foreach ($result['skill-level-nids'] as $skill_level_nid_key => $skill_level_nid) {
+				if ($skill_level_nid_key!='nid-all') {
+					$full_index_filters['skill-levels'][$skill_level_nid_key]['current-counts'][$page_type]++;
+				}
+			}
+			
 			//check skill level nids
 			$satisfies_skill_levels = false;
 			foreach ($current_index_filters['skill-level-nids'] as $skill_level_nid) {
@@ -164,13 +173,6 @@ function _ugyouthportal_set_index_page_results($current_index_filters) {
 			}
 			$satisfies_filters = $satisfies_filters && $satisfies_skill_levels;
 			if (!$satisfies_filters) continue;
-			
-			//activate these skill level filters for this result
-			foreach ($result['skill-level-nids'] as $skill_level_nid_key => $skill_level_nid) {
-				if ($skill_level_nid_key!='nid-all') {
-					$full_index_filters['skill-levels'][$skill_level_nid_key]['current-counts'][$page_type]++;
-				}
-			}
 			
 			//activate the media type filters here - they are independent of type and language
 			foreach ($result['types'] as $type_key) {
@@ -228,6 +230,8 @@ function _ugyouthportal_build_index_query($current_index_filters) {
 			node_field_data_field_lesson_plan_reference.nid AS lesson_plan_nid
 		FROM 
 			{node} node
+			INNER JOIN {node_type} node_node_type ON node.type = node_node_type.type
+			LEFT JOIN {languages} languages ON node.language = languages.language
 			LEFT JOIN {field_data_field_topic_reference} field_data_field_topic_reference ON node.nid = field_data_field_topic_reference.entity_id AND (field_data_field_topic_reference.entity_type = 'node' AND field_data_field_topic_reference.deleted = '0')
 			LEFT JOIN {node} node_field_data_field_topic_reference ON field_data_field_topic_reference.field_topic_reference_target_id = node_field_data_field_topic_reference.nid
 			LEFT JOIN {field_data_field_series_reference} field_data_field_series_reference ON node.nid = field_data_field_series_reference.entity_id AND (field_data_field_series_reference.entity_type = 'node' AND field_data_field_series_reference.deleted = '0')
@@ -236,10 +240,15 @@ function _ugyouthportal_build_index_query($current_index_filters) {
 			LEFT JOIN {node} node_field_data_field_skill_level_reference ON field_data_field_skill_level_reference.field_skill_level_reference_target_id = node_field_data_field_skill_level_reference.nid
 			LEFT JOIN {field_data_field_lesson_plan_reference} field_data_field_lesson_plan_reference ON node.nid = field_data_field_lesson_plan_reference.entity_id AND (field_data_field_lesson_plan_reference.entity_type = 'node' AND field_data_field_lesson_plan_reference.deleted = '0')
 			LEFT JOIN {node} node_field_data_field_lesson_plan_reference ON field_data_field_lesson_plan_reference.field_lesson_plan_reference_target_id = node_field_data_field_lesson_plan_reference.nid
+			LEFT JOIN {field_data_field_content_provider_reference} field_data_field_content_provider_reference ON node.nid = field_data_field_content_provider_reference.entity_id AND (field_data_field_content_provider_reference.entity_type = 'node' AND field_data_field_content_provider_reference.deleted = '0')
+			LEFT JOIN {node} node_field_data_field_content_provider_reference ON field_data_field_content_provider_reference.field_content_provider_reference_target_id = node_field_data_field_content_provider_reference.nid
 	";
 
 	if ($search_active) {
-		$query .= ' LEFT JOIN {field_data_body} field_data_body ON node.nid = field_data_body.entity_id';
+		$query .= ' LEFT JOIN {field_data_body} field_data_body ON node.nid = field_data_body.entity_id'; //content body
+		$query .= ' LEFT JOIN {field_data_body} field_data_body_lesson_plan ON node_field_data_field_lesson_plan_reference.nid = field_data_body.entity_id'; //lesson plan body
+		$query .= ' LEFT JOIN {field_data_body} field_data_body_series ON node_field_data_field_series_reference.nid = field_data_body.entity_id'; //series body
+		//$query .= ' LEFT JOIN {field_data_body} field_data_body_topic ON node_field_data_field_topic_reference.nid = field_data_body_topic.entity_id'; //topic body
 	}
 	
 	$query .= " WHERE ((( (node.status = '1') AND (node.type IN  ('audio', 'document', 'video')) )))";
@@ -273,7 +282,22 @@ function _ugyouthportal_build_index_query($current_index_filters) {
 	
 	//check search terms
 	if ($search_active) {
-		$query .= " AND( (node.title LIKE :search_term) OR (field_data_body.body_value LIKE :search_term) )";
+		/**
+		 * removed ....
+			OR field_data_body_topic.body_value LIKE :search_term
+		*/
+		$query .= " AND(
+									(node.title LIKE :search_term)
+									OR field_data_body.body_value LIKE :search_term
+									OR node_node_type.name LIKE :search_term
+									OR languages.name LIKE :search_term
+									OR node_field_data_field_topic_reference.title LIKE :search_term
+									OR node_field_data_field_skill_level_reference.title LIKE :search_term
+									OR node_field_data_field_lesson_plan_reference.title LIKE :search_term
+									OR node_field_data_field_series_reference.title LIKE :search_term
+									OR node_field_data_field_content_provider_reference.title LIKE :search_term
+									OR field_data_body_lesson_plan.body_value LIKE :search_term
+									OR field_data_body_series.body_value LIKE :search_term )";
 		$query_args[':search_term'] = '%'.db_like($current_index_filters['search-term']).'%';
 	}
 	
@@ -426,7 +450,8 @@ function _ugyouthportal_set_full_index_filters() {
 	$skill_levels = array(
 		'nid-all' => array (
 			'arg' => 'all',
-			'title' => 'All Skill Levels',
+			//'title' => 'All Skill Levels',
+			'title' => 'All',
 			'title-aliased' => 'all-skill-levels',
 			'total-counts' => array( 'all-content'=>0, 'all-lesson-plans'=>0, 'all-series'=>0, ),
 			'current-counts' => array( 'all-content'=>0, 'all-lesson-plans'=>0, 'all-series'=>0, ),
@@ -620,14 +645,15 @@ function _ugyouthportal_get_current_index_filter_values() {
  */
 function _ugyouthportal_get_url($current_index_filter_values, $item_options, $url_type) {
 	$page_args = arg();
-	$url = isset($page_args[1]) ? 'index/'.$page_args[1] : 'index/all-content';
+	$url = isset($page_args[1]) ? 'content-index/'.$page_args[1] : 'content-index/all-content';
 	$url_options = array();
 	$url_options['attributes']['title'] = isset($item_options['title']) ? $item_options['title'] : '';
 	$url_options['attributes']['title'] = isset($item_options['html-title']) ? $item_options['html-title'] : $url_options['attributes']['title'];
 	$url_options['html'] = isset($item_options['html-link']) ? $item_options['html-link'] : FALSE;
+	$url_options['attributes']['class'] = (isset($item_options['class']) && is_array($item_options['class'])) ? $item_options['class'] : array();
 	
 	if ($url_type=='primary-nav') {
-		$url = 'index/all-content';
+		$url = 'content-index/all-content';
 	}
 	
 	switch ($url_type) {
@@ -635,25 +661,33 @@ function _ugyouthportal_get_url($current_index_filter_values, $item_options, $ur
 		case 'all':
 			$url .= '/all-categories/all-skill-levels/all-types/all-languages';
 			$url_options['query'] = array( 'cid'=>'all', 'skid'=>'all', 'type'=>'all', 'lang'=>'all' );
+			if (isset($item_options['killsearch'])) {
+				$url_options['query']['killsearch'] = 1;
+			}
 			break;
 		case 'all-content-main-nav':
-			$url = 'index/all-content/all-categories/all-skill-levels/all-types/all-languages';
-			$url_options['query'] = array( 'cid'=>'all', 'skid'=>'all', 'type'=>'all', 'lang'=>'all', 'killsearch'=>'1', );
-			$url_options['attributes']['class'] = ($current_index_filter_values['page-type'] == 'all-content') ? array('active') : array();
+			$url = 'content-index/all-content/all-categories/all-skill-levels/all-types/all-languages';
+			$url_options['query'] = array( 'cid'=>'all', 'skid'=>'all', 'type'=>'all', 'lang'=>'all', );
+			$url_options['attributes']['class'][] = ($current_index_filter_values['page-type'] == 'all-content') ? 'active' : '';
 			break;
 		case 'all-lesson-plans-main-nav':
-			$url = 'index/all-lesson-plans/all-categories/all-skill-levels/all-types/all-languages';
-			$url_options['query'] = array( 'cid'=>'all', 'skid'=>'all', 'type'=>'all', 'lang'=>'all', 'killsearch'=>'1', );
-			$url_options['attributes']['class'] = ($current_index_filter_values['page-type'] == 'all-lesson-plans') ? array('active') : array();
+			$url = 'content-index/all-lesson-plans/all-categories/all-skill-levels/all-types/all-languages';
+			$url_options['query'] = array( 'cid'=>'all', 'skid'=>'all', 'type'=>'all', 'lang'=>'all', );
+			$url_options['attributes']['class'][] = ($current_index_filter_values['page-type'] == 'all-lesson-plans') ? 'active' : '';
 			break;
 		case 'all-series-main-nav':
-			$url = 'index/all-series/all-categories/all-skill-levels/all-types/all-languages';
-			$url_options['query'] = array( 'cid'=>'all', 'skid'=>'all', 'type'=>'all', 'lang'=>'all', 'killsearch'=>'1', );
-			$url_options['attributes']['class'] = ($current_index_filter_values['page-type'] == 'all-series') ? array('active') : array();
+			$url = 'content-index/all-series/all-categories/all-skill-levels/all-types/all-languages';
+			$url_options['query'] = array( 'cid'=>'all', 'skid'=>'all', 'type'=>'all', 'lang'=>'all', );
+			$url_options['attributes']['class'][] = ($current_index_filter_values['page-type'] == 'all-series') ? 'active' : '';
 			break;
 		case 'topics':
 			$url .= '/'.$item_options['alias'].'/all-skill-levels/all-types/all-languages';
-			$url_options['attributes']['class'] = ($current_index_filter_values['category-nid'] == $item_options['arg']) ? array('link', 'active') : array('link');
+			if ($current_index_filter_values['category-nid'] == $item_options['arg']) {
+				$url_options['attributes']['class'][] = 'link';
+				$url_options['attributes']['class'][] = 'active';
+			} else {
+				$url_options['attributes']['class'][] = 'link';
+			}
 			$url_options['query'] = array (
 				'cid' => $item_options['arg'],
 				'skid' => 'all',
@@ -662,8 +696,8 @@ function _ugyouthportal_get_url($current_index_filter_values, $item_options, $ur
 			);
 			break;
 		case 'landing-page-topic-in-content':
+		case 'landing-page-topic-in-content-header':
 			$url .= '/'.$item_options['alias'].'/'.$page_args[3].'/'.$page_args[4].'/'.$page_args[5];
-			$url_options['attributes']['class'] = array();
 			$url_options['query'] = array (
 				'cid' => $item_options['arg'],
 				'skid' => implode(',', $current_index_filter_values['skill-level-nids']),
@@ -673,7 +707,7 @@ function _ugyouthportal_get_url($current_index_filter_values, $item_options, $ur
 			break;
 		case 'active-filter-category':
 			$url .= '/'.$page_args[2].'/all-skill-levels/all-types/all-languages';
-			$url_options['attributes']['class'] = array('category');
+			$url_options['attributes']['class'][] = 'category';
 			$url_options['query'] = array (
 				'cid' => $current_index_filter_values['category-nid'],
 				'skid' => 'all',
@@ -683,7 +717,7 @@ function _ugyouthportal_get_url($current_index_filter_values, $item_options, $ur
 			break;
 		case 'active-filter-skill-level':
 			$url .= '/'.$page_args[2].'/'.$page_args[3].'/all-types/all-languages';
-			$url_options['attributes']['class'] = array('skill-level');
+			$url_options['attributes']['class'][] = 'skill-level';
 			$url_options['query'] = array (
 				'cid' => $current_index_filter_values['category-nid'],
 				'skid' => implode(',', $current_index_filter_values['skill-level-nids']),
@@ -693,7 +727,7 @@ function _ugyouthportal_get_url($current_index_filter_values, $item_options, $ur
 			break;
 		case 'active-filter-type':
 			$url .= '/'.$page_args[2].'/'.$page_args[3].'/'.$page_args[4].'/all-languages';
-			$url_options['attributes']['class'] = array('type');
+			$url_options['attributes']['class'][] = 'type';
 			$url_options['query'] = array (
 				'cid' => $current_index_filter_values['category-nid'],
 				'skid' => implode(',', $current_index_filter_values['skill-level-nids']),
@@ -703,7 +737,7 @@ function _ugyouthportal_get_url($current_index_filter_values, $item_options, $ur
 			break;
 		case 'active-filter-language':
 			$url .= '/'.$page_args[2].'/'.$page_args[3].'/'.$page_args[4].'/'.$page_args[5];
-			$url_options['attributes']['class'] = array('language');
+			$url_options['attributes']['class'][] = 'language';
 			$url_options['query'] = array (
 				'cid' => $current_index_filter_values['category-nid'],
 				'skid' => implode(',', $current_index_filter_values['skill-level-nids']),
@@ -713,7 +747,12 @@ function _ugyouthportal_get_url($current_index_filter_values, $item_options, $ur
 			break;
 		case 'types':
 			$url .= '/'.$page_args[2].'/'.$page_args[3].'/'.$item_options['alias'].'/all-languages';
-			$url_options['attributes']['class'] = ($current_index_filter_values['type'] == $item_options['arg']) ? array('link','active') : array('link');
+			if ($current_index_filter_values['type'] == $item_options['arg']) {
+				$url_options['attributes']['class'][] = 'link';
+				$url_options['attributes']['class'][] = 'active';
+			} else {
+				$url_options['attributes']['class'][] = 'link';
+			}
 			$url_options['query'] = array (
 				'cid' => $current_index_filter_values['category-nid'],
 				'skid' => implode(',', $current_index_filter_values['skill-level-nids']),
@@ -723,7 +762,12 @@ function _ugyouthportal_get_url($current_index_filter_values, $item_options, $ur
 			break;
 		case 'languages':
 			$url .= '/'.$page_args[2].'/'.$page_args[3].'/'.$page_args[4].'/'.$item_options['arg'];
-			$url_options['attributes']['class'] = ($current_index_filter_values['language'] == $item_options['arg']) ? array('link','active') : array('link');
+			if ($current_index_filter_values['language'] == $item_options['arg']) {
+				$url_options['attributes']['class'][] = 'link';
+				$url_options['attributes']['class'][] = 'active';
+			} else {
+				$url_options['attributes']['class'][] = 'link';
+			}
 			$url_options['query'] = array (
 				'cid' => $current_index_filter_values['category-nid'],
 				'skid' => implode(',', $current_index_filter_values['skill-level-nids']),
@@ -738,20 +782,24 @@ function _ugyouthportal_get_url($current_index_filter_values, $item_options, $ur
 			$url_part_2_args = array();
 			$current_args = $current_index_filter_values['skill-level-nids'];
 			$in_current_args = in_array($item_options['arg'], $current_args);
-			if ($current_args[0]=='all') { //if showing all, arguments should be singular e.g. /p1/
-				$url_part_2_args = array($item_options['arg']);
-			} elseif (!$in_current_args) { //if not showing all and not among the current args, just add to current args i.e. /p1,p2/
-				$url_part_2_args = $current_args;
-				$url_part_2_args[] = $item_options['arg'];
-			} elseif ($in_current_args) { //if not showing all and among current args, remove thyself from the link
-				$url_part_2_args = array();
-				if (count($current_args)==1) { //remove thyself and go back to all if singular arg
-					$url_part_2_args = array('all');
-				} else { //remove thyself from among many other nids
+			if ($item_options['arg']=='all') {
+				$url_part_2_args = array('all');
+			} else {
+				if ($current_args[0]=='all') { //if showing all, arguments should be singular e.g. /p1/
+					$url_part_2_args = array($item_options['arg']);
+				} elseif (!$in_current_args) { //if not showing all and not among the current args, just add to current args i.e. /p1,p2/
+					$url_part_2_args = $current_args;
+					$url_part_2_args[] = $item_options['arg'];
+				} elseif ($in_current_args) { //if not showing all and among current args, remove thyself from the link
 					$url_part_2_args = array();
-					foreach ($current_args as $arg) {
-						if ($arg != $item_options['arg']) {
-							$url_part_2_args[] = $arg;
+					if (count($current_args)==1) { //remove thyself and go back to all if singular arg
+						$url_part_2_args = array('all');
+					} else { //remove thyself from among many other nids
+						$url_part_2_args = array();
+						foreach ($current_args as $arg) {
+							if ($arg != $item_options['arg']) {
+								$url_part_2_args[] = $arg;
+							}
 						}
 					}
 				}
@@ -766,7 +814,12 @@ function _ugyouthportal_get_url($current_index_filter_values, $item_options, $ur
 			//continue
 			$url .= $url_part_2_args_aliases;
 			$url .= '/all-types/all-languages';
-			$url_options['attributes']['class'] = $in_current_args ? array('link','active') : array('link');
+			if ($in_current_args) {
+				$url_options['attributes']['class'][] = 'link';
+				$url_options['attributes']['class'][] = 'active';
+			} else {
+				$url_options['attributes']['class'][] = 'link';
+			}
 			$url_options['query'] = array (
 				'cid' => $current_index_filter_values['category-nid'],
 				'skid' => implode(',', $url_part_2_args),
@@ -795,13 +848,21 @@ function _ugyouthportal_get_index_link($current_index_filter_values, $item_optio
 		case 'types':
 		case 'languages':
 		case 'landing-page-topic-in-content':
+		case 'landing-page-topic-in-content-header':
 			$str = $item_options['title'];
 			$str .= (isset($item_options['count'])) ? ' <span class="count">('.$item_options['count'].')</span>' : '';
 			$str .= ($url_type!='skill-level' && $url_type!='landing-page-topic-in-content') ? '<span class="arrow"></span>' : '';
-			if ($item_options['count']>0) {
+			if ((isset($item_options['count']) && $item_options['count']>0) || $url_type=='landing-page-topic-in-content-header') {
 				return l($str, $url['url'], $url['options']);
 			} else {
-				return '<span class="link no-link">'.$str.'</span>';
+				/*
+				if ($url_type=='topics') {
+					return '<span class="link no-link">'.$str.'</span>';
+				} else {
+					return FALSE;
+				}
+				*/
+				return FALSE;
 			}
 		case 'skill-levels':
 			$str = $item_options['title'];

@@ -30,7 +30,7 @@ $mega_menu_title_about_page = '<div class="img">'.$default_menu_title_icon.'</di
 
 $active_topic_nid = false;
 $page_args = arg();
-if (isset($page_args[0])&& $page_args[0]=='index') {
+if (isset($page_args[0])&& $page_args[0]=='content-index') {
 	$mega_menu_title = $mega_menu_title_index_page;
 } elseif ($_GET['q']=='node/234') {
 	$mega_menu_title = $mega_menu_title_about_page;
@@ -115,6 +115,7 @@ module_load_include('index_page.inc', 'ugyouthportal');
 $link_options = array (
 	'title' => 'View the Content Index',
 	'html-link' => TRUE,
+	'killsearch' => TRUE,
 );
 $all_url = _ugyouthportal_get_url(array(), $link_options, 'primary-nav');
 $index_link = l(

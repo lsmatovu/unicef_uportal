@@ -4,11 +4,11 @@ global $ugyouthportal_data;
 
 $page_type = $ugyouthportal_data['current-index-filter-values']['page-type'];
 $path = ($page_type=='all-lesson-plans') ? 'lesson-plan' : 'series';
-$images_view = ($page_type=='all-lesson-plans') ? 'block-5' : 'block_4';
+$images_view = ($page_type=='all-lesson-plans') ? 'block_7' : 'block_4';
 
 //make image
-$series_plan_nid = $row->nid;
-$images_results = views_get_view_result('content_index', 'block_4', $series_plan_nid);
+$lesson_plan_nid = $row->nid;
+$images_results = views_get_view_result('content_index', $images_view, $lesson_plan_nid);
 $images = array();
 $img_str = '';
 foreach ($images_results as $image_result) {
@@ -29,7 +29,7 @@ $nid = $row->nid;
 $body = $fields['body']->content;
 $node_language = $row->node_language;
 
-//$ugyouthportal_data['dsm_fields'] = array ( 'images' => $series_images, 'series-nid'=>$series_plan_nid, );
+//$ugyouthportal_data['dsm_fields'] = array ( 'images' => $images_results, 'lesson-plan-nid'=>$lesson_plan_nid, );
 
 $link_html = "
 	<span class=\"index-item-wrapper clearfix series-plan-wrapper\">
